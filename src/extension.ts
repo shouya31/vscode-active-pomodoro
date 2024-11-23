@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 
 let pomodoroCount = 0;
 let isRunning = false;
-let focusTime = 25; // デフォルト25分
-let breakTime = 5;  // デフォルト5分
-let totalSessions = 4; // デフォルト4回
+let focusTime = 25;
+let breakTime = 5;
+let totalSessions = 4;
 let currentSession = 0;
 let interval: NodeJS.Timeout | undefined;
 let statusBarItem: vscode.StatusBarItem;
@@ -19,16 +19,15 @@ export function activate(context: vscode.ExtensionContext) {
 
     const startCommand = vscode.commands.registerCommand('extension.startPomodoro', async () => {
         if (isRunning) {
-            vscode.window.showInformationMessage('ポモドーロは既に開始されています。');
+            vscode.window.showInformationMessage('Pomodoro is already running.');
             return;
         }
 
         isRunning = true;
 
-        // ユーザー入力の取得
-        focusTime = await getInput('集中時間（分）を入力してください。', focusTime);
-        breakTime = await getInput('休憩時間（分）を入力してください。', breakTime);
-        totalSessions = await getInput('ポモドーロの回数を入力してください。', totalSessions);
+        focusTime = await getInput('Enter focus time (minutes):', focusTime);
+        breakTime = await getInput('Enter break time (minutes):', breakTime);
+        totalSessions = await getInput('Enter number of pomodoro sessions:', totalSessions);
 
         currentSession = 1;
         remainingTime = focusTime * 60;
@@ -42,7 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
         const hours = Math.floor(totalFocusTime / 3600);
         const minutes = Math.floor((totalFocusTime % 3600) / 60);
         const seconds = totalFocusTime % 60;
-        vscode.window.showInformationMessage(`今日の集中時間: ${hours}時間${minutes}分${seconds}秒`);
+        vscode.window.showInformationMessage(`Today's focus time: ${hours}h ${minutes}m ${seconds}s`);
     });
 
     context.subscriptions.push(startCommand);
@@ -51,15 +50,12 @@ export function activate(context: vscode.ExtensionContext) {
     statusBarItem.command = 'extension.startPomodoro';
     updateStatusBar();
 
-    // ウィンドウのフォーカスイベントを監視
     vscode.window.onDidChangeWindowState((windowState) => {
         if (windowState.focused) {
-            // ウィンドウがフォーカスされたとき
             if (isRunning && !interval) {
                 startTimer();
             }
         } else {
-            // ウィンドウがフォーカスを失ったとき
             if (isRunning && interval) {
                 clearInterval(interval);
                 interval = undefined;
@@ -87,20 +83,20 @@ function startTimer() {
         if (remainingTime <= 0) {
             if (isFocus) {
                 if (currentSession >= totalSessions) {
-                    vscode.window.showInformationMessage('ポモドーロが完了しました！');
+                    vscode.window.showInformationMessage('Pomodoro sessions completed!');
                     clearInterval(interval);
                     interval = undefined;
                     isRunning = false;
                     updateStatusBar();
                     return;
                 } else {
-                    vscode.window.showInformationMessage('休憩時間です！');
+                    vscode.window.showInformationMessage('Time for a break!');
                     isFocus = false;
                     remainingTime = breakTime * 60;
                 }
             } else {
                 currentSession++;
-                vscode.window.showInformationMessage('次のポモドーロを開始します！');
+                vscode.window.showInformationMessage('Starting next pomodoro session!');
                 isFocus = true;
                 remainingTime = focusTime * 60;
             }
@@ -114,9 +110,9 @@ function updateStatusBar() {
     if (isRunning) {
         const minutes = Math.floor(remainingTime / 60);
         const seconds = remainingTime % 60;
-        statusBarItem.text = `$(clock) ポモドーロ ${currentSession}/${totalSessions} - ${isFocus ? '集中' : '休憩'}: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        statusBarItem.text = `$(clock) pomodoro ${currentSession}/${totalSessions} - ${isFocus ? 'focus' : 'break'}: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     } else {
-        statusBarItem.text = `$(clock) ポモドーロ開始`;
+        statusBarItem.text = `$(clock) start pomodoro`;
     }
     statusBarItem.show();
 }
