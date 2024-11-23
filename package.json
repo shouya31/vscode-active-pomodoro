@@ -9,13 +9,20 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onCommand:extension.startPomodoro",
+    "onCommand:extension.showTotalFocusTime"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "vscode-active-pomodoro.helloWorld",
-        "title": "Hello World"
+        "command": "extension.startPomodoro",
+        "title": "Start Pomodoro"
+      },
+      {
+        "command": "extension.showTotalFocusTime",
+        "title": "Show Today's Focus Time"
       }
     ]
   },

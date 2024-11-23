@@ -1,26 +1,129 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+let pomodoroCount = 0;
+let isRunning = false;
+let focusTime = 25; // デフォルト25分
+let breakTime = 5;  // デフォルト5分
+let totalSessions = 4; // デフォルト4回
+let currentSession = 0;
+let interval: NodeJS.Timeout | undefined;
+let statusBarItem: vscode.StatusBarItem;
+let remainingTime = focusTime * 60;
+let isFocus = true;
+let totalFocusTime = 0;
+
 export function activate(context: vscode.ExtensionContext) {
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "vscode-active-pomodoro" is now active!');
+    statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+    context.subscriptions.push(statusBarItem);
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('vscode-active-pomodoro.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from vscode-active-pomodoro!');
-	});
+    const startCommand = vscode.commands.registerCommand('extension.startPomodoro', async () => {
+        if (isRunning) {
+            vscode.window.showInformationMessage('ポモドーロは既に開始されています。');
+            return;
+        }
 
-	context.subscriptions.push(disposable);
+        isRunning = true;
+
+        // ユーザー入力の取得
+        focusTime = await getInput('集中時間（分）を入力してください。', focusTime);
+        breakTime = await getInput('休憩時間（分）を入力してください。', breakTime);
+        totalSessions = await getInput('ポモドーロの回数を入力してください。', totalSessions);
+
+        currentSession = 1;
+        remainingTime = focusTime * 60;
+        isFocus = true;
+
+        updateStatusBar();
+        startTimer();
+    });
+
+    const showTotalTimeCommand = vscode.commands.registerCommand('extension.showTotalFocusTime', () => {
+        const hours = Math.floor(totalFocusTime / 3600);
+        const minutes = Math.floor((totalFocusTime % 3600) / 60);
+        const seconds = totalFocusTime % 60;
+        vscode.window.showInformationMessage(`今日の集中時間: ${hours}時間${minutes}分${seconds}秒`);
+    });
+
+    context.subscriptions.push(startCommand);
+    context.subscriptions.push(showTotalTimeCommand);
+
+    statusBarItem.command = 'extension.startPomodoro';
+    updateStatusBar();
+
+    // ウィンドウのフォーカスイベントを監視
+    vscode.window.onDidChangeWindowState((windowState) => {
+        if (windowState.focused) {
+            // ウィンドウがフォーカスされたとき
+            if (isRunning && !interval) {
+                startTimer();
+            }
+        } else {
+            // ウィンドウがフォーカスを失ったとき
+            if (isRunning && interval) {
+                clearInterval(interval);
+                interval = undefined;
+            }
+        }
+    });
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() {}
+async function getInput(prompt: string, defaultValue: number): Promise<number> {
+    const result = await vscode.window.showInputBox({
+        prompt: prompt,
+        value: defaultValue.toString()
+    });
+    return result ? parseInt(result) : defaultValue;
+}
+
+function startTimer() {
+    interval = setInterval(() => {
+        remainingTime--;
+
+        if (isFocus) {
+            totalFocusTime++;
+        }
+
+        if (remainingTime <= 0) {
+            if (isFocus) {
+                if (currentSession >= totalSessions) {
+                    vscode.window.showInformationMessage('ポモドーロが完了しました！');
+                    clearInterval(interval);
+                    interval = undefined;
+                    isRunning = false;
+                    updateStatusBar();
+                    return;
+                } else {
+                    vscode.window.showInformationMessage('休憩時間です！');
+                    isFocus = false;
+                    remainingTime = breakTime * 60;
+                }
+            } else {
+                currentSession++;
+                vscode.window.showInformationMessage('次のポモドーロを開始します！');
+                isFocus = true;
+                remainingTime = focusTime * 60;
+            }
+        }
+
+        updateStatusBar();
+    }, 1000);
+}
+
+function updateStatusBar() {
+    if (isRunning) {
+        const minutes = Math.floor(remainingTime / 60);
+        const seconds = remainingTime % 60;
+        statusBarItem.text = `$(clock) ポモドーロ ${currentSession}/${totalSessions} - ${isFocus ? '集中' : '休憩'}: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    } else {
+        statusBarItem.text = `$(clock) ポモドーロ開始`;
+    }
+    statusBarItem.show();
+}
+
+export function deactivate() {
+    if (interval) {
+        clearInterval(interval);
+    }
+    statusBarItem.hide();
+}
